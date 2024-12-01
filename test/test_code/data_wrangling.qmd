@@ -1,0 +1,112 @@
+---
+title: "Wrangling"
+format: html
+---
+
+# Tasks  
+1. Average 5 min interval data to 15 min interval
+2. Combine environment data with quantum yield of photosystem II (response variable) data
+
+Here is where we load the packages we will use.
+
+```{r setup}
+#| message: false
+#| warning: false
+
+# Loading packages
+library(tidyverse) # for data wrangling and plotting
+library(lubridate)
+```
+
+
+### 1) Load environ data
+```{r}
+environ_g <- read_csv("../test_data/environ_g.csv")
+
+environ_g
+```
+
+### 2) Change time format having 15-min interval
+```{r}
+environ_g_dfw <- environ_g %>%
+  mutate(time = as.POSIXct(time, format = "%m/%d/%Y %H:%M")) %>%
+  mutate(time_shifted = time + minutes(10)) %>%
+  mutate(time_15min = lubridate::floor_date(time_shifted, unit = "15 minutes")) %>%
+  relocate(time_shifted, time_15min, .before = eppfd)
+
+environ_g_dfw
+```
+
+### 3) Average values into 15-min interval and filter out values measured in the night time
+
+```{r}
+environ_g_dfw <- environ_g_dfw %>%
+  group_by(time_15min) %>%
+  summarise(across(-c(eppfd_inst, ppfd_inst, pri_g_inst), ~mean(.x, na.rm = TRUE), .names = "{.col}"),
+            across(c(eppfd_inst, ppfd_inst, pri_g_inst), ~nth(.x, 3, default = NA))) %>%
+  ungroup() %>%
+  filter(format(time_15min, "%H:%M") >= "07:30" & format(time_15min, "%H:%M") <= "19:00")
+
+environ_g_dfw
+```
+
+### 4) Load chlorophyll fluorescence data
+```{r}
+cf_g <- read_csv("../test_data/cf_g.csv")
+
+cf_g
+```
+
+### 5) Adjust the time format and filter out night time values
+```{r}
+cf_g_dfw <- cf_g %>%
+    mutate(time = as.POSIXct(time, format = "%m/%d/%Y %H:%M"),
+           time_15min = round_date(time, unit = "15 minutes")) %>%
+  filter(format(time_15min, "%H:%M") >= "07:30" & format(time_15min, "%H:%M") <= "19:00")
+
+cf_g_dfw
+```
+
+### 6) Check if both "time_15min" columns from both datasets are identical
+```{r}
+# Get unique time_15min values from both datasets
+time_environ <- unique(environ_g_dfw$time_15min)
+time_cf <- unique(cf_g_dfw$time_15min)
+
+# Check if all values in environ_g_dfw exist in cf_g_dfw and vice versa
+all_in_cf <- all(time_environ %in% time_cf) # Are all times in environ in cf?
+all_in_environ <- all(time_cf %in% time_environ) # Are all times in cf in environ?
+
+# Print results
+if (all_in_cf && all_in_environ) {
+  print("The time_15min columns in both datasets are identical.")
+} else {
+  print("The time_15min columns have differences.")
+}
+
+```
+Those are identical!
+
+### 7) Merge two datasets
+```{r}
+merged_g <- environ_g_dfw %>%
+  left_join(cf_g_dfw, by = "time_15min")
+
+merged_g
+```
+
+
+
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+```
