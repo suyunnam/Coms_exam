@@ -21,7 +21,8 @@ library(lubridate)
 
 ### 1) Load environ data
 ```{r}
-environ_g <- read_csv("../test_data/environ_g.csv")
+environ_g <- read_csv("../test_data/environ_g.csv") %>%
+  mutate(time = as.POSIXct(time, format = "%m/%d/%Y %H:%M"))
 
 environ_g
 ```
@@ -29,7 +30,6 @@ environ_g
 ### 2) Change time format having 15-min interval
 ```{r}
 environ_g_dfw <- environ_g %>%
-  mutate(time = as.POSIXct(time, format = "%m/%d/%Y %H:%M")) %>%
   mutate(time_shifted = time + minutes(10)) %>%
   mutate(time_15min = lubridate::floor_date(time_shifted, unit = "15 minutes")) %>%
   relocate(time_shifted, time_15min, .before = eppfd)
@@ -52,7 +52,8 @@ environ_g_dfw
 
 ### 4) Load chlorophyll fluorescence data
 ```{r}
-cf_g <- read_csv("../test_data/cf_g.csv")
+cf_g <- read_csv("../test_data/cf_g.csv") %>%
+  mutate(time = as.POSIXct(time, format = "%m/%d/%Y %H:%M"))
 
 cf_g
 ```
@@ -60,8 +61,8 @@ cf_g
 ### 5) Adjust the time format and filter out night time values
 ```{r}
 cf_g_dfw <- cf_g %>%
-    mutate(time = as.POSIXct(time, format = "%m/%d/%Y %H:%M"),
-           time_15min = round_date(time, unit = "15 minutes")) %>%
+  mutate(time_15min = round_date(time, unit = "15 minutes"),
+         loc = as.factor(loc)) %>%
   filter(format(time_15min, "%H:%M") >= "07:30" & format(time_15min, "%H:%M") <= "19:00")
 
 cf_g_dfw
@@ -91,22 +92,15 @@ Those are identical!
 ```{r}
 merged_g <- environ_g_dfw %>%
   left_join(cf_g_dfw, by = "time_15min")
+ 
+merged_g <- merged_g %>%
+  select(-c(time.x, time.y, time_shifted)) %>%
+  mutate(time_15min = format(time_15min, tzone = "America/New_York"))
 
 merged_g
 ```
 
-
-
-
+### 8) Save the merged dataset as another csv file
 ```{r}
-
-```
-
-```{r}
-
-```
-
-
-```{r}
-
+write_csv(merged_g,"../test_data/merged_g.csv")
 ```
